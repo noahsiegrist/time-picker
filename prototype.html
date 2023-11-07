@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angle Calculator with Magnifying Glass</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 0 auto;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 20px),
+                        repeating-linear-gradient(90deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 20px);
+        }
+        #angleDisplay {
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="angleCanvas" width="800" height="800"></canvas>
+    <div id="angleDisplay">00:00:00</div>
+
+    <script>
+        const canvas = document.getElementById('angleCanvas');
+        const ctx = canvas.getContext('2d');
+        const angleDisplay = document.getElementById('angleDisplay');
+
+        const offsetScaling = x => Math.pow((x/40), 3);
+        const innerCyrcleRadius =  offsetScaling(120)
+
+        const centerCanvasX = canvas.width / 2;
+        const centerCanvasY = canvas.height / 2;
+
+        let centerX = centerCanvasX;
+        let centerY = centerCanvasY;
+
+        let distanceToCenter = 0;
+        let distanceCursorToCircleCenter = 0;
+
+        let fixedOffsetX = 0;
+        let fixedOffsetY = 0;
+
+        function caluclateCenterOffset(x, y) {
+            const curserOffCenterX = x-centerCanvasX;
+            const curserOffCenterY = y-centerCanvasY;
+
+            let offsetX = -offsetScaling(curserOffCenterX);
+            let offsetY = -offsetScaling(curserOffCenterY);
+            // console.log(offsetX, curserOffCenterX)
+            const curserOffCyrcleX = centerX-centerCanvasX-curserOffCenterX;
+            const curserOffCyrcleY = centerY-centerCanvasY-curserOffCenterY;
+            
+            distanceCursorToCircleCenter = Math.sqrt(((curserOffCyrcleX)**2)+((curserOffCyrcleY)**2));
+
+            distanceToCenter = Math.sqrt((offsetX**2)+(offsetY**2));
+            // console.log("Distance from screen sencer to cyrcle", distanceToCenter);
+            if(distanceToCenter < innerCyrcleRadius) {
+                fixedOffsetX = offsetX;
+                fixedOffsetY = offsetY;
+            }else{
+                offsetX = fixedOffsetX * Math.abs(distanceCursorToCircleCenter/innerCyrcleRadius/2);
+                offsetY = fixedOffsetY * Math.abs(distanceCursorToCircleCenter/innerCyrcleRadius/2);
+
+            }
+
+            centerX = centerCanvasX + offsetX;
+            centerY = centerCanvasY + offsetY;
+        }
+
+        function drawLineToCursor(x, y) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        }
+
+        function calculateAngle(x, y) {
+            const dx = x - centerX;
+            const dy = y - centerY;
+            let angle = Math.atan2(dy, dx) - Math.PI / 2;
+            if (angle < 0) angle += 2 * Math.PI;
+            return angle;
+        }
+
+        function angleToTime(angle) {
+            const totalSeconds = angle / (2 * Math.PI) * 86400;
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            
+            caluclateCenterOffset(mouseX, mouseY);
+            drawLineToCursor(mouseX, mouseY);
+            const angle = calculateAngle(mouseX, mouseY);
+            angleDisplay.textContent = angleToTime(angle);
+
+            drawRings();
+        });
+
+        function drawRings() {
+	        ctx.beginPath();
+            ctx.arc(centerCanvasX, centerCanvasY, innerCyrcleRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+        
+       	    const hourStartT =  distanceCursorToCircleCenter - 150;
+       	    const hourStart = hourStartT > 50?hourStartT:50;
+            
+            // Draw hour ring
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, hourStart , 0, 2 * Math.PI);
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+
+            for (let i = 0; i < 24; i++) {
+                const angle = (i / 24) * 2 * Math.PI;
+                const startX = centerX + hourStart * Math.cos(angle);
+                const startY = centerY + hourStart * Math.sin(angle);
+                const endX = centerX + (hourStart + 50) * Math.cos(angle);
+                const endY = centerY + (hourStart + 50) * Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            }
+            
+            if(distanceToCenter > 100&& false) {
+                const minuteStart =  distanceCursorToCircleCenter-100;
+                // Draw minute ring
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, minuteStart, 0, 2 * Math.PI);
+                ctx.strokeStyle = "#000";
+                ctx.stroke();
+
+                for (let i = 0; i < 24 * 60; i++) {
+                    // only every 5 min
+                    const angle = (i / (24 * 60)) * 2 * Math.PI;
+                    const startX = centerX + minuteStart * Math.cos(angle);
+                    const startY = centerY + minuteStart * Math.sin(angle);
+                    const endX = centerX + (minuteStart + 10) * Math.cos(angle);
+                    const endY = centerY + (minuteStart + 10) * Math.sin(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+
+                if(distanceToCenter > 1000) {
+                const minuteStart = distanceCursorToCircleCenter-50;
+                // Draw minute ring
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, minuteStart, 0, 2 * Math.PI);
+                ctx.strokeStyle = "#000";
+                ctx.stroke();
+
+                for (let i = 0; i < 24 * 60 * 60; i++) {
+                    // only every 5 min
+                    const angle = (i / (24 * 60 * 60)) * 2 * Math.PI;
+                    const startX = centerX + minuteStart * Math.cos(angle);
+                    const startY = centerY + minuteStart * Math.sin(angle);
+                    const endX = centerX + (minuteStart + 10) * Math.cos(angle);
+                    const endY = centerY + (minuteStart + 10) * Math.sin(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+                
+            }
+            }
+        }
+
+       
+        drawRings();
+    </script>
+</body>
+</html>
+
