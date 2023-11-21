@@ -21,6 +21,24 @@
             fill: none;
         }
 
+        .dial {
+            fill: #1b1b53;
+        }
+
+        .paint {
+            stroke: #F5F5F5;
+            stroke-width: 1;
+            fill: none;
+        }
+
+        .hours {
+            stroke-width: 4;
+        }
+
+        .minutes {
+            stroke-width: 0.5;
+        }
+
     </style>
 </head>
 <body>
@@ -28,11 +46,13 @@
     <div id="angleDisplay">00:00</div>
 
     <script>
+        const SCREEN_WIDTH = 800;
+
         const svg = document.getElementById('angleSvg');
         const angleDisplay = document.getElementById('angleDisplay');
 
-        const centerCanvasX = 400;
-        const centerCanvasY = 400;
+        const centerCanvasX = SCREEN_WIDTH/2;
+        const centerCanvasY = SCREEN_WIDTH/2;
 
         let centerX = centerCanvasX;
         let centerY = centerCanvasY;
@@ -64,18 +84,19 @@
             }
         }
 
-        let hourStart = 200;
-        let minutesStart = hourStart + 50;
+        const hourStart = 350;
+        const lineWidth = 30;
+        const minutesStart = hourStart + lineWidth;
 
         const minuteLines = [];
         for (let i = 0; i < 24 * 60 ; i++) {
             const angle = (i / (24 * 60)) * 2 * Math.PI;
-            const startX = centerX + minutesStart * Math.cos(angle);
-            const startY = centerY + minutesStart * Math.sin(angle);
-            const endX = centerX + (minutesStart + 50) * Math.cos(angle);
-            const endY = centerY + (minutesStart + 50) * Math.sin(angle);
+            const startX = centerX + (hourStart -5) * Math.cos(angle);
+            const startY = centerY + (hourStart -5) * Math.sin(angle);
+            const endX = centerX + (hourStart - 10) * Math.cos(angle);
+            const endY = centerY + (hourStart - 10) * Math.sin(angle);
 
-            const minuteLine = createTree([], createLine(startX, startY, endX, endY, "black"), (elem, c) => {
+            const minuteLine = createTree([], createLine(startX, startY, endX, endY, "paint minutes"), (elem, c) => {
                 //setCircleRadius(hourRing, 50);
                 //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
                 return c;
@@ -95,12 +116,12 @@
         const hourLines = [];
         for (let i = 0; i < 24; i++) {
             const angle = (i / 24) * 2 * Math.PI;
-            const startX = centerX + hourStart * Math.cos(angle);
-            const startY = centerY + hourStart * Math.sin(angle);
-            const endX = centerX + (hourStart + 50) * Math.cos(angle);
-            const endY = centerY + (hourStart + 50) * Math.sin(angle);
+            const startX = centerX + (hourStart-5)  * Math.cos(angle);
+            const startY = centerY + (hourStart-5)  * Math.sin(angle);
+            const endX = centerX + (hourStart - lineWidth) * Math.cos(angle);
+            const endY = centerY + (hourStart - lineWidth) * Math.sin(angle);
 
-            const hourLine = createTree([], createLine(startX, startY, endX, endY, "black"), (elem, c) => {
+            const hourLine = createTree([], createLine(startX, startY, endX, endY, "paint hours"), (elem, c) => {
                 //setCircleRadius(hourRing, 50);
                 //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
                 return c;
@@ -110,7 +131,7 @@
             hourLines.push(hourLine);
         }
 
-        const hourRing = createTree(hourLines, createCircle(centerCanvasX, centerCanvasY, hourStart, "black"), (elem, c) => {
+        const hourRing = createTree(hourLines, createCircle(centerCanvasX, centerCanvasY, hourStart, "dial"), (elem, c) => {
             //setCircleRadius(hourRing, 50);
             //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
             return c;
@@ -157,7 +178,7 @@
         tree.appendToSvg(svg);
 
         // Create initial elements
-        let mainLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "black");
+        let mainLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "paint");
         svg.appendChild(mainLine);
 
         function moveViewBox(x, y, zoomLevel) {
@@ -169,18 +190,25 @@
                 viewBox[3] = 800;
 
             }else {
-                viewBox[0] = x - (400/zoomLevel);
-                viewBox[1] = y - (400/zoomLevel);
-                viewBox[2] = 800/zoomLevel;
-                viewBox[3] = 800/zoomLevel;
+                viewBox[0] = x - (centerX/zoomLevel);
+                viewBox[1] = y - (centerY/zoomLevel);
+                viewBox[2] = SCREEN_WIDTH/zoomLevel;
+                viewBox[3] = SCREEN_WIDTH/zoomLevel;
             }
+
+            // Prevent the svg from going out of bounds
+            /*if(viewBox[0] < 0) viewBox[0] = 0;
+            if(viewBox[1] < 0) viewBox[1] = 0;
+            if(viewBox[0]+viewBox[2] > SCREEN_WIDTH) viewBox[0] =  SCREEN_WIDTH-viewBox[2];
+            if(viewBox[1]+viewBox[3] > SCREEN_WIDTH) viewBox[1] =  SCREEN_WIDTH-viewBox[3];
+            */
             svg.setAttribute('viewBox', viewBox.join(' '));
         }
 
         let zoomLevel = 1;
 
-        let mouseX = 0;
-        let mouseY = 0;
+        let mouseX = centerX;
+        let mouseY = centerY;
 
         // Function to update the line and circle based on mouse position
         svg.addEventListener('mousemove', (e) => {
@@ -188,20 +216,13 @@
             const rect = svg.getBoundingClientRect();
             svg.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
             
-            zoomLevel = (Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2))/200)+1;
+            zoomLevel = (Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2))/100)+1;
             mouseX = e.clientX - rect.left;
             mouseY = e.clientY - rect.top;
-            console.log(mouseX, mouseY, zoomLevel)
+
             moveViewBox(mouseX,mouseY,zoomLevel);
 
-
             // Update line
-            if(mouseX < 0 || mouseY < 0 || mouseX > 800 || mouseY > 800){
-                mainLine.setAttribute("x2", centerX);
-                mainLine.setAttribute("y2", centerY);
-                return;
-            }
-            
             mainLine.setAttribute("x2", mouseX);
             mainLine.setAttribute("y2", mouseY);
 
