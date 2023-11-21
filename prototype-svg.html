@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Angle Calculator</title>
+    <style>
+        svg {
+            border: 1px solid black;
+            display: block;
+            margin: 0 auto;
+        }
+        #angleDisplay {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .black {
+            stroke: black;
+            stroke-width: 0.5;
+            fill: none;
+        }
+
+    </style>
+</head>
+<body>
+    <svg id="angleSvg" width="800" height="800" viewbox="0 0 800 800"></svg>
+    <div id="angleDisplay">00:00</div>
+
+    <script>
+        const svg = document.getElementById('angleSvg');
+        const angleDisplay = document.getElementById('angleDisplay');
+
+        const centerCanvasX = 400;
+        const centerCanvasY = 400;
+
+        let centerX = centerCanvasX;
+        let centerY = centerCanvasY;
+
+        let distanceToCenter = 0;
+        let distanceCursorToCircleCenter = 0;
+        
+
+        const createTree = (children, elem, update, applies) => {
+            return {
+                traverse: (context) => {
+                    if(!applies(children, elems)) {
+                        return;
+                    }
+                    
+                    context = update(elem, context);
+
+                    children.forEach((child) => {
+                        child.traverse(context);
+                    });
+                },
+                appendToSvg: (svg) => {
+                    if(elem != null)
+                        svg.appendChild(elem);
+                    children.forEach((child) => {
+                        child.appendToSvg(svg);
+                    });
+                }
+            }
+        }
+
+        let hourStart = 200;
+        let minutesStart = hourStart + 50;
+
+        const minuteLines = [];
+        for (let i = 0; i < 24 * 60 ; i++) {
+            const angle = (i / (24 * 60)) * 2 * Math.PI;
+            const startX = centerX + minutesStart * Math.cos(angle);
+            const startY = centerY + minutesStart * Math.sin(angle);
+            const endX = centerX + (minutesStart + 50) * Math.cos(angle);
+            const endY = centerY + (minutesStart + 50) * Math.sin(angle);
+
+            const minuteLine = createTree([], createLine(startX, startY, endX, endY, "black"), (elem, c) => {
+                //setCircleRadius(hourRing, 50);
+                //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
+                return c;
+            }, (children, elem) => {
+                return true;
+            });
+            minuteLines.push(minuteLine);
+        }
+        const minuteRing = createTree(minuteLines, createCircle(centerCanvasX, centerCanvasY, minutesStart, "black"), (elem, c) => {
+            //setCircleRadius(hourRing, 50);
+            //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
+            return c;
+        }, (children, elem) => {
+            return true;
+        });
+
+        const hourLines = [];
+        for (let i = 0; i < 24; i++) {
+            const angle = (i / 24) * 2 * Math.PI;
+            const startX = centerX + hourStart * Math.cos(angle);
+            const startY = centerY + hourStart * Math.sin(angle);
+            const endX = centerX + (hourStart + 50) * Math.cos(angle);
+            const endY = centerY + (hourStart + 50) * Math.sin(angle);
+
+            const hourLine = createTree([], createLine(startX, startY, endX, endY, "black"), (elem, c) => {
+                //setCircleRadius(hourRing, 50);
+                //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
+                return c;
+            }, (children, elem) => {
+                return true;
+            });
+            hourLines.push(hourLine);
+        }
+
+        const hourRing = createTree(hourLines, createCircle(centerCanvasX, centerCanvasY, hourStart, "black"), (elem, c) => {
+            //setCircleRadius(hourRing, 50);
+            //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
+            return c;
+        }, (children, elem) => {
+            return true;
+        });
+
+        const tree = createTree([hourRing, minuteRing], null, (c) => {
+            //setCircleRadius(hourRing, 50);
+            //setCircleCenter(hourRing, centerCanvasX, centerCanvasY);
+            return c;
+        }, (children, elem) => {
+            return true;
+        });
+
+        function createCircle(cx, cy, r, classes) {
+            let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", cx);
+            circle.setAttribute("cy", cy);
+            circle.setAttribute("r", r);
+            circle.setAttribute("class", classes);
+            return circle;
+        }
+
+        function setCircleRadius(circle, r) {
+            circle.setAttribute("r", r);
+        }
+
+        function setCircleCenter(circle, cx, cy) {
+            circle.setAttribute("cx", cx);
+            circle.setAttribute("cy", cy);
+        }
+
+        function createLine(x1, y1, x2, y2, classes) {
+            let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("class", classes);
+            return line;
+        }
+
+        tree.appendToSvg(svg);
+
+        // Create initial elements
+        let mainLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "black");
+        svg.appendChild(mainLine);
+
+        function moveViewBox(x, y, zoomLevel) {
+            var viewBox = svg.getAttribute('viewBox').split(' ').map(Number);
+            if(zoomLevel == 1)    {
+                viewBox[0] = 0;
+                viewBox[1] = 0;
+                viewBox[2] = 800;
+                viewBox[3] = 800;
+
+            }else {
+                viewBox[0] = x - (400/zoomLevel);
+                viewBox[1] = y - (400/zoomLevel);
+                viewBox[2] = 800/zoomLevel;
+                viewBox[3] = 800/zoomLevel;
+            }
+            svg.setAttribute('viewBox', viewBox.join(' '));
+        }
+
+        let zoomLevel = 1;
+
+        let mouseX = 0;
+        let mouseY = 0;
+
+        // Function to update the line and circle based on mouse position
+        svg.addEventListener('mousemove', (e) => {
+
+            const rect = svg.getBoundingClientRect();
+            svg.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
+            
+            zoomLevel = (Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2))/200)+1;
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            console.log(mouseX, mouseY, zoomLevel)
+            moveViewBox(mouseX,mouseY,zoomLevel);
+
+
+            // Update line
+            if(mouseX < 0 || mouseY < 0 || mouseX > 800 || mouseY > 800){
+                mainLine.setAttribute("x2", centerX);
+                mainLine.setAttribute("y2", centerY);
+                return;
+            }
+            
+            mainLine.setAttribute("x2", mouseX);
+            mainLine.setAttribute("y2", mouseY);
+
+            // Calculate angle and update display
+            let angle = Math.atan2(mouseY - centerCanvasY, mouseX - centerCanvasX) + Math.PI / 2;
+            if (angle < 0) angle += 2 * Math.PI;
+            const totalSeconds = angle / (2 * Math.PI) * 86400;
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            angleDisplay.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;//:${seconds.toString().padStart(2, '0')}
+        });
+
+    </script>
+</body>
+</html>
