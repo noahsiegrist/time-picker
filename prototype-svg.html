@@ -43,7 +43,7 @@
 </head>
 <body>
     <svg id="angleSvg" width="800" height="800" viewbox="0 0 800 800"></svg>
-    <div id="angleDisplay">00:00</div>
+    <div id="angleDisplay"></div>
 
     <script>
         const SCREEN_WIDTH = 800;
@@ -59,6 +59,22 @@
 
         let distanceToCenter = 0;
         let distanceCursorToCircleCenter = 0;
+
+        let zoomLevel = 1;
+
+        let mouseX = centerX;
+        let mouseY = centerY;
+
+        let firstTime = null;
+        let secondTime = null;
+
+        const ViewMode = {
+            NO_TIME: 'no_time_selected',
+            FIRST: 'first_time_selected',
+            SECOND: 'second_time_selected'
+        };
+
+        let viewMode = ViewMode.NO_TIME;
         
 
         const createTree = (children, elem, update, applies) => {
@@ -85,6 +101,7 @@
         }
 
         const hourStart = 350;
+        const r = hourStart;
         const lineWidth = 30;
         const minutesStart = hourStart + lineWidth;
 
@@ -147,22 +164,13 @@
             return true;
         });
 
-        function createCircle(cx, cy, r, classes) {
+        function createCircle(cx, cy, radius, classes) {
             let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", cx);
             circle.setAttribute("cy", cy);
-            circle.setAttribute("r", r);
+            circle.setAttribute("r", radius);
             circle.setAttribute("class", classes);
             return circle;
-        }
-
-        function setCircleRadius(circle, r) {
-            circle.setAttribute("r", r);
-        }
-
-        function setCircleCenter(circle, cx, cy) {
-            circle.setAttribute("cx", cx);
-            circle.setAttribute("cy", cy);
         }
 
         function createLine(x1, y1, x2, y2, classes) {
@@ -175,11 +183,83 @@
             return line;
         }
 
+        function getTimeStringByAngle(angle){
+            angle += Math.PI / 2;
+            if (angle < 0) angle += 2 * Math.PI;
+            const totalSeconds = angle / (2 * Math.PI) * 86400;
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+
+        function writeTime() {
+            string = "";
+            if(firstTime == null) {
+                string += "__:__";
+            }else {
+                string += getTimeStringByAngle(firstTime);
+            }
+            string += " - ";
+            if(secondTime == null) {
+                string += "__:__";
+            }else {
+                string += getTimeStringByAngle(secondTime);
+            }
+
+            angleDisplay.textContent = string;
+        }
+
+        function drawLineToEdge(angle, line) {
+            if (angle < 0) angle += 2 * Math.PI;
+            const endX = centerCanvasX + r * Math.cos(angle);
+            const endY = centerCanvasY + r * Math.sin(angle);
+            line.setAttribute("x2", endX);
+            line.setAttribute("y2", endY);
+        }
+
+        function hideLineInCenter(line) {
+            line.setAttribute("x2", centerCanvasX);
+            line.setAttribute("y2", centerCanvasX);
+        }
+
+        function setFirstTime(angle) {
+            firstTime = angle;
+            writeTime();
+            if(angle == null) {
+                hideLineInCenter(firstLine);
+            } else {
+                drawLineToEdge(angle, firstLine);
+            }
+        }
+
+        function setSecondTime(angle) {
+            secondTime = angle;
+            writeTime();
+            if(angle == null) {
+                hideLineInCenter(secondLine);
+            } else {
+                drawLineToEdge(angle, secondLine);
+            }
+        }
+
         tree.appendToSvg(svg);
 
         // Create initial elements
         let mainLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "paint");
         svg.appendChild(mainLine);
+
+        let firstLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "paint selected");
+        svg.appendChild(firstLine);
+        let secondLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "paint selected");
+        svg.appendChild(firstLine);
+
+        /*let areaSlice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        areaSlice.setAttribute("cx", centerCanvasX);
+        areaSlice.setAttribute("cy", centerCanvasY);
+        areaSlice.setAttribute("r", radiu);
+        areaSlice.setAttribute("class", "area-slice");
+        svg.appendChild(areaSlice);
+*/
 
         function moveViewBox(x, y, zoomLevel) {
             var viewBox = svg.getAttribute('viewBox').split(' ').map(Number);
@@ -196,19 +276,12 @@
                 viewBox[3] = SCREEN_WIDTH/zoomLevel;
             }
 
-            // Prevent the svg from going out of bounds
-            /*if(viewBox[0] < 0) viewBox[0] = 0;
-            if(viewBox[1] < 0) viewBox[1] = 0;
-            if(viewBox[0]+viewBox[2] > SCREEN_WIDTH) viewBox[0] =  SCREEN_WIDTH-viewBox[2];
-            if(viewBox[1]+viewBox[3] > SCREEN_WIDTH) viewBox[1] =  SCREEN_WIDTH-viewBox[3];
-            */
             svg.setAttribute('viewBox', viewBox.join(' '));
         }
 
-        let zoomLevel = 1;
+        writeTime();
 
-        let mouseX = centerX;
-        let mouseY = centerY;
+        let angle = null;
 
         // Function to update the line and circle based on mouse position
         svg.addEventListener('mousemove', (e) => {
@@ -216,24 +289,50 @@
             const rect = svg.getBoundingClientRect();
             svg.scrollIntoView({behavior: "smooth", block: "center", inline: "center"});
             
-            zoomLevel = (Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2))/100)+1;
-            mouseX = e.clientX - rect.left;
-            mouseY = e.clientY - rect.top;
+            if(viewMode != ViewMode.SECOND) {
+                zoomLevel = Math.log((Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2))/400+1))*5+1;
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
 
-            moveViewBox(mouseX,mouseY,zoomLevel);
+                moveViewBox(mouseX,mouseY,zoomLevel);
 
-            // Update line
-            mainLine.setAttribute("x2", mouseX);
-            mainLine.setAttribute("y2", mouseY);
+                // Calculate angle and update display
+                angle = Math.atan2(mouseY - centerCanvasY, mouseX - centerCanvasX);
+                drawLineToEdge(angle, mainLine)
+                
 
-            // Calculate angle and update display
-            let angle = Math.atan2(mouseY - centerCanvasY, mouseX - centerCanvasX) + Math.PI / 2;
-            if (angle < 0) angle += 2 * Math.PI;
-            const totalSeconds = angle / (2 * Math.PI) * 86400;
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            angleDisplay.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;//:${seconds.toString().padStart(2, '0')}
+                if(viewMode == ViewMode.NO_TIME) {
+                    setFirstTime(angle);
+                }else if(viewMode == ViewMode.FIRST) {
+                    setSecondTime(angle);
+                }
+            }
+            
+
+        });
+
+        svg.addEventListener('mouseleave', () => {
+            zoomLevel = 1;
+            moveViewBox(centerX, centerY, zoomLevel);
+        });
+
+        
+
+        svg.addEventListener('click', (e) => {
+            if(viewMode == ViewMode.NO_TIME) {
+                viewMode = ViewMode.FIRST;
+                setFirstTime(angle);
+            }else if(viewMode == ViewMode.FIRST) {
+                viewMode = ViewMode.SECOND;
+                setSecondTime(angle);
+            }else if(viewMode == ViewMode.SECOND) {
+                viewMode = ViewMode.NO_TIME;
+                setFirstTime(null);
+                setSecondTime(null);
+            }
+
+            zoomLevel = 1;
+            moveViewBox(mouseX, mouseY, zoomLevel);
         });
 
     </script>
