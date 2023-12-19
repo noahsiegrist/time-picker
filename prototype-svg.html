@@ -39,6 +39,11 @@
             stroke-width: 0.5;
         }
 
+        .slice {
+            fill: #fff;
+            opacity: 0.2;
+        }
+
     </style>
 </head>
 <body>
@@ -253,13 +258,61 @@
         let secondLine = createLine(centerCanvasX, centerCanvasY, centerCanvasX, centerCanvasY, "paint selected");
         svg.appendChild(firstLine);
 
-        /*let areaSlice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        areaSlice.setAttribute("cx", centerCanvasX);
-        areaSlice.setAttribute("cy", centerCanvasY);
-        areaSlice.setAttribute("r", radiu);
-        areaSlice.setAttribute("class", "area-slice");
-        svg.appendChild(areaSlice);
-*/
+        let slice = null;
+
+        function removePartialCircle() {
+            if (slice) {
+                svg.removeChild(slice);
+                slice = null;
+            }
+        }
+
+
+        function addPartialCircle() {
+            removePartialCircle();
+
+            const startAngle = firstTime;
+            const endAngle = secondTime;
+
+            const angle = Math.abs(endAngle - startAngle);
+
+          
+            const start1 = {
+                x: centerCanvasX + r * Math.cos(startAngle),
+                y: centerCanvasY + r * Math.sin(startAngle),
+            };
+
+            const end1 = {
+                x: centerCanvasX + r * Math.cos(startAngle + angle/2),
+                y: centerCanvasY + r * Math.sin(startAngle + angle/2),
+            };
+
+            const end2 = {
+                x: centerCanvasX + r * Math.cos(endAngle),
+                y: centerCanvasY + r * Math.sin(endAngle),
+            };
+
+            const d1 = [
+                "M", centerCanvasX, centerCanvasY,
+                "L", start1.x, start1.y,
+                "A", r, r, 0, 0, 1, end1.x, end1.y,
+                "Z"
+            ].join(" ");
+
+            const d2 = [
+                "M", centerCanvasX, centerCanvasY,
+                "L", end1.x, end1.y,
+                "A", r, r, 0, 0, 1, end2.x, end2.y,
+                "Z"
+            ].join(" ");
+
+            slice = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            slice.setAttribute("d", d1 + " " + d2);
+            slice.setAttribute("class", "slice"); 
+            slice.setAttribute("stroke", "none"); 
+
+            svg.appendChild(slice);
+        }
 
         function moveViewBox(x, y, zoomLevel) {
             var viewBox = svg.getAttribute('viewBox').split(' ').map(Number);
@@ -283,7 +336,6 @@
 
         let angle = null;
 
-        // Function to update the line and circle based on mouse position
         svg.addEventListener('mousemove', (e) => {
 
             const rect = svg.getBoundingClientRect();
@@ -296,7 +348,6 @@
 
                 moveViewBox(mouseX,mouseY,zoomLevel);
 
-                // Calculate angle and update display
                 angle = Math.atan2(mouseY - centerCanvasY, mouseX - centerCanvasX);
                 drawLineToEdge(angle, mainLine)
                 
@@ -322,13 +373,16 @@
             if(viewMode == ViewMode.NO_TIME) {
                 viewMode = ViewMode.FIRST;
                 setFirstTime(angle);
+                removePartialCircle();
             }else if(viewMode == ViewMode.FIRST) {
                 viewMode = ViewMode.SECOND;
                 setSecondTime(angle);
+                addPartialCircle();
             }else if(viewMode == ViewMode.SECOND) {
                 viewMode = ViewMode.NO_TIME;
                 setFirstTime(null);
                 setSecondTime(null);
+                removePartialCircle();removePartialCircle 
             }
 
             zoomLevel = 1;
